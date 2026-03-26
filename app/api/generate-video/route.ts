@@ -6,6 +6,7 @@ import {
   MAX_SCRIPT_LENGTH,
   MIN_SCRIPT_LENGTH,
 } from "@/lib/generation-constraints";
+import { uploadImageAndGetPublicUrl } from "@/lib/supabase-storage";
 import { generateSeedanceVideo, SeedanceApiError } from "@/lib/seedance";
 
 export const runtime = "nodejs";
@@ -48,11 +49,11 @@ export async function POST(request: Request) {
       return badRequest(`Script must be ${MAX_SCRIPT_LENGTH} characters or fewer.`);
     }
 
-    const result = await generateSeedanceVideo({
-      image,
-      script: trimmedScript,
-      requestId,
-    });
+    console.info("[api/generate-video] image:upload-start", { requestId });
+    const imageUrl = await uploadImageAndGetPublicUrl(image, requestId);
+    console.info("[api/generate-video] image:upload-success", { requestId, imageUrl });
+
+    const result = await generateSeedanceVideo({ imageUrl, script: trimmedScript, requestId });
 
     console.info("[api/generate-video] request:success", {
       requestId,

@@ -3,11 +3,15 @@ type EnvConfig = {
   seedanceApiUrl: string;
   seedanceModel: string;
   requestTimeoutMs: number;
+  supabaseUrl: string;
+  supabaseServiceRoleKey: string;
+  supabaseStorageBucket: string;
 };
 
 const DEFAULT_SEEDANCE_API_URL = "https://api.kie.ai";
 const DEFAULT_SEEDANCE_MODEL = "bytedance/seedance-1.5-pro";
 const DEFAULT_TIMEOUT_MS = 120_000;
+const DEFAULT_SUPABASE_BUCKET = "uploads";
 
 function getRequiredEnv(name: string): string {
   const value = process.env[name];
@@ -46,5 +50,9 @@ export function getEnvConfig(): EnvConfig {
     seedanceApiUrl: process.env.SEEDANCE_API_URL ?? DEFAULT_SEEDANCE_API_URL,
     seedanceModel: process.env.SEEDANCE_MODEL ?? DEFAULT_SEEDANCE_MODEL,
     requestTimeoutMs: parseTimeout(process.env.SEEDANCE_REQUEST_TIMEOUT_MS),
+    supabaseUrl: getRequiredEnv("SUPABASE_URL"),
+    supabaseServiceRoleKey: getRequiredEnv("SUPABASE_SERVICE_ROLE_KEY"),
+    supabaseStorageBucket:
+      process.env.SUPABASE_STORAGE_BUCKET ?? DEFAULT_SUPABASE_BUCKET,
   };
 }

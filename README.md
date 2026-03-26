@@ -11,6 +11,7 @@ cp .env.example .env.local
 ```
 
 Use a KIE key in `KIE_API_KEY`. `SEEDANCE_API_KEY` and `ARK_API_KEY` are still supported as fallback aliases.
+Set Supabase server credentials too: `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and optionally `SUPABASE_STORAGE_BUCKET` (default `uploads`, must be public).
 
 ## Getting started
 
@@ -38,4 +39,5 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 
 - The server uses Node.js runtime for the generation route.
 - Video generation now uses KIE task APIs (`/api/v1/jobs/createTask` + `/api/v1/jobs/recordInfo`) and returns `videoUrl` on success.
+- Uploaded images are stored in Supabase Storage first, then the generated public URL is sent to KIE `input_urls`.
 - Default model is `bytedance/seedance-1.5-pro` on KIE.

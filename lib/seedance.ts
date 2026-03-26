@@ -20,13 +20,13 @@ type ProviderLikeError = Error & {
 };
 
 type GenerateSeedanceVideoInput = {
-  image: File;
+  imageUrl: string;
   script: string;
   requestId?: string;
 };
 
 export async function generateSeedanceVideo({
-  image,
+  imageUrl,
   script,
   requestId = "unknown",
 }: GenerateSeedanceVideoInput): Promise<SeedanceSuccessResult> {
@@ -40,16 +40,11 @@ export async function generateSeedanceVideo({
       requestId,
       apiUrl: config.seedanceApiUrl,
       model: config.seedanceModel,
-      imageType: image.type,
-      imageSize: image.size,
+      imageUrl,
       scriptLength: script.length,
       timeoutMs: config.requestTimeoutMs,
       provider: "kie-api",
     });
-
-    const imageBytes = new Uint8Array(await image.arrayBuffer());
-    const imageBase64 = Buffer.from(imageBytes).toString("base64");
-    const imageDataUrl = `data:${image.type || "image/png"};base64,${imageBase64}`;
 
     const createResponse = await fetch(`${config.seedanceApiUrl}/api/v1/jobs/createTask`, {
       method: "POST",
@@ -61,7 +56,7 @@ export async function generateSeedanceVideo({
         model: config.seedanceModel,
         input: {
           prompt: script,
-          input_urls: ["https://t4.ftcdn.net/jpg/03/06/23/67/360_F_306236750_KX8unZjLlGZS027G0IL8We3mBjUMG5TQ.jpg"],
+          input_urls: [imageUrl],
           aspect_ratio: "16:9",
           resolution: "720p",
           duration: "4",
@@ -184,7 +179,7 @@ export async function generateSeedanceVideo({
       const finalStatus = providerStatus === 401 || providerStatus === 403 ? providerStatus : 502;
       const finalMessage =
         providerStatus === 401
-          ? "Authentication failed. Use a valid BytePlus ARK API key (ARK_API_KEY)."
+          ? "Authentication failed. Use a valid KIE API key (KIE_API_KEY)."
           : mappedMessage;
 
       console.error("[seedance] request:provider-http-error", {
@@ -201,7 +196,7 @@ export async function generateSeedanceVideo({
       error,
       mappedMessage,
     });
-    throw new SeedanceApiError(`Seedance SDK request failed: ${mappedMessage}`, 502);
+    throw new SeedanceApiError(`Seedance request failed: ${mappedMessage}`, 502);
   } finally {
     clearTimeout(timeoutId);
   }
