@@ -9,33 +9,37 @@ function extensionFromType(mimeType: string): string {
   return "bin";
 }
 
-export async function uploadImageAndGetPublicUrl(
-  image: File,
-  requestId: string,
-): Promise<string> {
+function createAdminSupabaseClient() {
   const config = getEnvConfig();
-  const supabase = createClient(
-    config.supabaseUrl,
-    config.supabaseServiceRoleKey,
-    {
-      auth: { persistSession: false },
-    },
-  );
+  return createClient(config.supabaseUrl, config.supabaseServiceRoleKey, {
+    auth: { persistSession: false },
+  });
+}
 
-  const extension = extensionFromType(image.type);
+export async function createSignedImageUpload(
+  imageMimeType: string,
+  requestId: string,
+): Promise<{
+  bucket: string;
+  objectPath: string;
+  token: string;
+  signedUrl: string;
+  publicUrl: string;
+}> {
+  const config = getEnvConfig();
+  const supabase = createAdminSupabaseClient();
+
+  const extension = extensionFromType(imageMimeType);
   const objectPath = `seedance/${requestId}-${crypto.randomUUID()}.${extension}`;
-  const arrayBuffer = await image.arrayBuffer();
 
-  const uploadResult = await supabase.storage
+  const signedUploadResult = await supabase.storage
     .from(config.supabaseStorageBucket)
-    .upload(objectPath, arrayBuffer, {
-      contentType: image.type || "application/octet-stream",
-      upsert: false,
-      cacheControl: "3600",
-    });
+    .createSignedUploadUrl(objectPath, { upsert: false });
 
-  if (uploadResult.error) {
-    throw new Error(`Supabase upload failed: ${uploadResult.error.message}`);
+  if (signedUploadResult.error || !signedUploadResult.data) {
+    throw new Error(
+      `Supabase signed upload URL creation failed: ${signedUploadResult.error?.message ?? "Unknown error"}`,
+    );
   }
 
   const publicUrlResult = supabase.storage
@@ -47,5 +51,11 @@ export async function uploadImageAndGetPublicUrl(
     throw new Error("Supabase upload succeeded but public URL is missing.");
   }
 
-  return publicUrl;
+  return {
+    bucket: config.supabaseStorageBucket,
+    objectPath,
+    token: signedUploadResult.data.token,
+    signedUrl: signedUploadResult.data.signedUrl,
+    publicUrl,
+  };
 }

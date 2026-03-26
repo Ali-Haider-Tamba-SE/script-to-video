@@ -1,6 +1,7 @@
 "use client";
 
 import { FormEvent, useMemo, useState } from "react";
+import { createClient } from "@supabase/supabase-js";
 
 import {
   ALLOWED_IMAGE_TYPES,
@@ -15,6 +16,14 @@ type GenerateResponse = {
   error?: string;
 };
 
+type CreateUploadResponse = {
+  bucket?: string;
+  objectPath?: string;
+  token?: string;
+  publicUrl?: string;
+  error?: string;
+};
+
 function toMb(bytes: number): string {
   return `${Math.round((bytes / (1024 * 1024)) * 10) / 10}MB`;
 }
@@ -25,6 +34,9 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [videoSrc, setVideoSrc] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+
+  const supabasePublicUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   const scriptLength = script.trim().length;
   const canSubmit = useMemo(() => {
@@ -62,16 +74,61 @@ export default function Home() {
       return;
     }
 
-    const formData = new FormData();
-    formData.set("image", image);
-    formData.set("script", script.trim());
-
     setIsLoading(true);
 
     try {
+      if (!supabasePublicUrl || !supabaseAnonKey) {
+        setError("Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY.");
+        return;
+      }
+
+      const createUploadResponse = await fetch("/api/create-image-upload", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          contentType: image.type,
+        }),
+      });
+      const createUploadData = (await createUploadResponse.json()) as CreateUploadResponse;
+
+      if (!createUploadResponse.ok) {
+        setError(createUploadData.error ?? "Could not create upload URL.");
+        return;
+      }
+
+      if (
+        !createUploadData.bucket ||
+        !createUploadData.objectPath ||
+        !createUploadData.token ||
+        !createUploadData.publicUrl
+      ) {
+        setError("Upload target is missing required fields.");
+        return;
+      }
+
+      const supabase = createClient(supabasePublicUrl, supabaseAnonKey, {
+        auth: { persistSession: false },
+      });
+      const uploadResult = await supabase.storage
+        .from(createUploadData.bucket)
+        .uploadToSignedUrl(createUploadData.objectPath, createUploadData.token, image, {
+          contentType: image.type || "application/octet-stream",
+          cacheControl: "3600",
+          upsert: false,
+        });
+
+      if (uploadResult.error) {
+        setError(`Image upload failed: ${uploadResult.error.message}`);
+        return;
+      }
+
       const response = await fetch("/api/generate-video", {
         method: "POST",
-        body: formData,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          imageUrl: createUploadData.publicUrl,
+          script: script.trim(),
+        }),
       });
       const data = (await response.json()) as GenerateResponse;
 

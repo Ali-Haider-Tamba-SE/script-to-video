@@ -1,12 +1,9 @@
 import { NextResponse } from "next/server";
 
 import {
-  ALLOWED_IMAGE_TYPES,
-  MAX_IMAGE_BYTES,
   MAX_SCRIPT_LENGTH,
   MIN_SCRIPT_LENGTH,
 } from "@/lib/generation-constraints";
-import { uploadImageAndGetPublicUrl } from "@/lib/supabase-storage";
 import { generateSeedanceVideo, SeedanceApiError } from "@/lib/seedance";
 
 export const runtime = "nodejs";
@@ -20,20 +17,25 @@ export async function POST(request: Request) {
 
   try {
     console.info("[api/generate-video] request:start", { requestId });
-    const formData = await request.formData();
-    const image = formData.get("image");
-    const script = formData.get("script");
+    const payload = (await request.json()) as {
+      imageUrl?: string;
+      script?: string;
+    };
+    const { imageUrl, script } = payload;
 
-    if (!(image instanceof File)) {
-      return badRequest("Image is required.");
+    if (typeof imageUrl !== "string" || !imageUrl.trim()) {
+      return badRequest("Image URL is required.");
     }
 
-    if (!ALLOWED_IMAGE_TYPES.includes(image.type as (typeof ALLOWED_IMAGE_TYPES)[number])) {
-      return badRequest("Image must be JPG, PNG, or WEBP.");
+    let parsedImageUrl: URL;
+    try {
+      parsedImageUrl = new URL(imageUrl);
+    } catch {
+      return badRequest("Image URL must be a valid URL.");
     }
 
-    if (image.size > MAX_IMAGE_BYTES) {
-      return badRequest("Image must be 10MB or smaller.");
+    if (parsedImageUrl.protocol !== "http:" && parsedImageUrl.protocol !== "https:") {
+      return badRequest("Image URL must be http or https.");
     }
 
     if (typeof script !== "string") {
@@ -49,11 +51,11 @@ export async function POST(request: Request) {
       return badRequest(`Script must be ${MAX_SCRIPT_LENGTH} characters or fewer.`);
     }
 
-    console.info("[api/generate-video] image:upload-start", { requestId });
-    const imageUrl = await uploadImageAndGetPublicUrl(image, requestId);
-    console.info("[api/generate-video] image:upload-success", { requestId, imageUrl });
-
-    const result = await generateSeedanceVideo({ imageUrl, script: trimmedScript, requestId });
+    const result = await generateSeedanceVideo({
+      imageUrl: parsedImageUrl.toString(),
+      script: trimmedScript,
+      requestId,
+    });
 
     console.info("[api/generate-video] request:success", {
       requestId,
