@@ -1,36 +1,41 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+## Seedance 1.5 Image + Script to Video
 
-## Getting Started
+This app lets a user upload one image and a script, then generates a video using Seedance 1.5.
 
-First, run the development server:
+## Environment variables
+
+Copy `.env.example` to `.env.local` and fill in your key:
 
 ```bash
+cp .env.example .env.local
+```
+
+Use a KIE key in `KIE_API_KEY`. `SEEDANCE_API_KEY` and `ARK_API_KEY` are still supported as fallback aliases.
+
+## Getting started
+
+Install dependencies and run the development server:
+
+```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## API
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+- `POST /api/generate-video`
+  - Accepts `multipart/form-data`
+  - Required fields:
+    - `image` (`image/jpeg`, `image/png`, `image/webp`, max 10MB)
+    - `script` (10-2000 chars)
+  - Returns JSON:
+    - `{ "videoUrl": "..." }` when provider returns a URL
+    - `{ "videoDataUrl": "data:video/...;base64,..." }` when provider returns binary/base64
 
-## Learn More
+## Notes
 
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- The server uses Node.js runtime for the generation route.
+- Video generation now uses KIE task APIs (`/api/v1/jobs/createTask` + `/api/v1/jobs/recordInfo`) and returns `videoUrl` on success.
+- Default model is `bytedance/seedance-1.5-pro` on KIE.
