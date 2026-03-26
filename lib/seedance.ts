@@ -25,6 +25,78 @@ type GenerateSeedanceVideoInput = {
   requestId?: string;
 };
 
+type ScriptLine =
+  | { type: "dialogue"; speaker: string; text: string }
+  | { type: "direction"; text: string };
+
+const SPEAKER_LINE_PATTERN = /^([^:\n]{1,80}):\s*(.+)$/;
+
+function parseScriptLines(script: string): ScriptLine[] {
+  return script
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean)
+    .map((line) => {
+      const match = SPEAKER_LINE_PATTERN.exec(line);
+      if (!match) {
+        return { type: "direction", text: line } satisfies ScriptLine;
+      }
+
+      const [, rawSpeaker, rawText] = match;
+      const speaker = rawSpeaker.trim();
+      const text = rawText.trim();
+
+      if (!speaker || !text) {
+        return { type: "direction", text: line } satisfies ScriptLine;
+      }
+
+      return { type: "dialogue", speaker, text } satisfies ScriptLine;
+    });
+}
+
+function buildStructuredScript(script: string): string {
+  const lines = parseScriptLines(script);
+  const dialogueTurns = lines.filter(
+    (line): line is Extract<ScriptLine, { type: "dialogue" }> => line.type === "dialogue",
+  );
+
+  if (dialogueTurns.length < 2) {
+    return script;
+  }
+
+  const cast = [...new Set(dialogueTurns.map((line) => line.speaker))];
+
+  return [
+    "CAST:",
+    ...cast.map((speaker, index) => `${index + 1}. ${speaker}`),
+    "",
+    "TURNS:",
+    ...lines.map((line, index) =>
+      line.type === "dialogue"
+        ? `${index + 1}. TYPE=dialogue | SPEAKER=${line.speaker} | EXACT_WORDS=${line.text}`
+        : `${index + 1}. TYPE=direction | TEXT=${line.text}`,
+    ),
+  ].join("\n");
+}
+
+function buildSeedancePrompt(script: string): string {
+  const structuredScript = buildStructuredScript(script);
+
+  return [
+    "Follow this script exactly.",
+    "Understand the scene and spoken dialogue before generating.",
+    "If the script includes speaker labels, each label is a different person.",
+    "Each person must only say their own line and must never speak another person's line.",
+    "Do not merge multiple turns into one monologue.",
+    "Keep dialogue order exactly as written.",
+    "Lines marked TYPE=direction are scene direction, not spoken dialogue.",
+    "Lines marked TYPE=dialogue must be spoken only by the listed speaker using the exact words provided.",
+    "",
+    "SCRIPT:",
+    structuredScript,
+  ].join("\n");
+}
+
 export async function generateSeedanceVideo({
   imageUrl,
   script,
@@ -55,11 +127,11 @@ export async function generateSeedanceVideo({
       body: JSON.stringify({
         model: config.seedanceModel,
         input: {
-          prompt: script,
+          prompt: buildSeedancePrompt(script),
           input_urls: [imageUrl],
           aspect_ratio: "16:9",
           resolution: "720p",
-          duration: "4",
+          duration: "12",
           fixed_lens: false,
           generate_audio: true,
         },

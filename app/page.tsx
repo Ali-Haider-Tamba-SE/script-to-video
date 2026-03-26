@@ -187,7 +187,7 @@ export default function Home() {
               rows={7}
               value={script}
               onChange={(event) => setScript(event.target.value)}
-              placeholder="Describe the scene, camera movement, and style..."
+              placeholder={"Write scene + dialogue.\nUse one line per speaker, e.g.\nAli: We need to leave now.\nSara: Wait, I forgot the keys."}
               className="block w-full rounded-lg border border-black/10 bg-white px-3 py-2 text-sm dark:border-white/20 dark:bg-zinc-900"
             />
             <p className="text-xs text-zinc-500 dark:text-zinc-400">
